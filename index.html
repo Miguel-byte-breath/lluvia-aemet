@@ -2,34 +2,32 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>S.I.G. Agro-Climático AEMET</title>
+    <title>S.I.G. Agro-Climático AEMET Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f0f4f8; color: #1e293b; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f1f5f9; color: #1e293b; }
         .container { max-width: 1000px; margin: auto; }
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .header-step { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; color: #1e3a8a; font-weight: bold; font-size: 1.2em; }
+        .header-step { border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px; color: #1e3a8a; font-weight: bold; }
         .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .btn-blue { background: #3b82f6; color: white; }
-        .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; font-size: 1.1em; }
+        .btn-blue { background: #2563eb; color: white; }
+        .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; }
         .btn:hover { opacity: 0.9; }
         input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
-        .result-box { background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe; margin-top: 15px; }
+        .result-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px; }
         .chart-container { height: 400px; margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
-        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: right; }
-        th:first-child, td:first-child { text-align: left; }
-        th { background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 0.8em; }
-        .decimal-highlight { font-weight: bold; color: #2563eb; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
+        th { background: #f1f5f9; text-align: left; }
+        td:first-child { text-align: left; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="card">
-        <div class="header-step">📍 1. Localizar Estación más Cercana</div>
-        <p>Introduce las coordenadas de tu parcela (latitud/longitud):</p>
+        <div class="header-step">📍 1. Localizar Estación por Coordenadas</div>
         <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
             Lat: <input type="number" id="userLat" value="39.443557" step="0.000001">
             Lon: <input type="number" id="userLon" value="-0.740434" step="0.000001">
@@ -39,22 +37,17 @@
     </div>
 
     <div class="card">
-        <div class="header-step">📊 2. Análisis y Exportación de datos</div>
-        <p>Carga el JSON de lluvia obtenido de Postman:</p>
+        <div class="header-step">📊 2. Análisis y Exportación (Formato Regional)</div>
+        <p>Carga el archivo <code>datos_historicos.json</code> que has bajado de Postman:</p>
         <input type="file" id="fileDatos" accept=".json">
         
         <div id="panelAnalisis" style="display:none">
-            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Excel</button>
+            <button id="btnExcel" class="btn btn-green">📥 Descargar Resumen en EXCEL (Decimales con Coma)</button>
             <div class="chart-container">
                 <canvas id="graficaLluvia"></canvas>
             </div>
             <table id="tablaResumen">
-                <thead>
-                    <tr>
-                        <th>Mes / Periodo</th>
-                        <th>Precipitación Acumulada (mm)</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Periodo</th><th>Precipitación Acumulada (mm)</th></tr></thead>
                 <tbody id="cuerpoTabla"></tbody>
             </table>
         </div>
@@ -62,76 +55,61 @@
 </div>
 
 <script>
-// --- CONVERTIDOR COORDENADAS AEMET ---
+// --- LÓGICA DE BÚSQUEDA ---
 function aemetToDec(coord) {
     if(!coord) return 0;
-    const dir = coord.slice(-1);
-    const n = coord.slice(0, -1);
-    const s = parseFloat(n.slice(-2));
-    const m = parseFloat(n.slice(-4, -2));
-    const g = parseFloat(n.slice(0, n.length - 4));
+    const dir = coord.slice(-1), n = coord.slice(0, -1);
+    const s = parseFloat(n.slice(-2)), m = parseFloat(n.slice(-4, -2)), g = parseFloat(n.slice(0, n.length - 4));
     let dec = g + (m/60) + (s/3600);
     return (dir === 'S' || dir === 'W') ? -dec : dec;
 }
 
-// --- BUSCADOR ---
 function encontrarMasCercana() {
-    fetch('estaciones.json')
-        .then(res => res.json())
-        .then(estaciones => {
-            const latU = parseFloat(document.getElementById('userLat').value);
-            const lonU = parseFloat(document.getElementById('userLon').value);
-            let mejor = null, dMin = Infinity;
-
-            estaciones.forEach(est => {
-                const latE = aemetToDec(est.latitud);
-                const lonE = aemetToDec(est.longitud);
-                const d = Math.sqrt(Math.pow(latU - latE, 2) + Math.pow(lonU - lonE, 2)) * 111;
-                if(d < dMin) { dMin = d; mejor = est; }
-            });
-
-            const res = document.getElementById('resBusqueda');
-            res.style.display = "block";
-            res.innerHTML = `
-                <strong>✅ Estación detectada:</strong> ${mejor.nombre}<br>
-                <strong>📌 Indicativo:</strong> <span style="color:#e11d48; font-size:1.2em">${mejor.indicativo}</span><br>
-                <strong>📏 Distancia:</strong> ${dMin.toLocaleString('es-ES', {maxFractionDigits:2})} km
-            `;
-        }).catch(() => alert("Error: Sube 'estaciones.json' a tu GitHub primero."));
+    fetch('estaciones.json').then(r => r.json()).then(ests => {
+        const latU = parseFloat(document.getElementById('userLat').value);
+        const lonU = parseFloat(document.getElementById('userLon').value);
+        let mejor = null, dMin = Infinity;
+        ests.forEach(e => {
+            const d = Math.sqrt(Math.pow(latU - aemetToDec(e.latitud), 2) + Math.pow(lonU - aemetToDec(e.longitud), 2));
+            if(d < dMin) { dMin = d; mejor = e; }
+        });
+        const res = document.getElementById('resBusqueda');
+        res.style.display = "block";
+        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Cód:</strong> <span style="color:#e11d48">${mejor.indicativo}</span> | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES')} km`;
+    });
 }
 
-// --- ANÁLISIS Y EXCEL ---
+// --- PROCESADOR MULTI-FORMATO ---
 let miGrafica = null;
-let datosExportar = [];
+let datosExport = [];
 
 document.getElementById('fileDatos').addEventListener('change', function(e) {
     const reader = new FileReader();
-    reader.onload = (event) => {
-        const datos = JSON.parse(event.target.result);
+    reader.onload = (ev) => {
+        const datos = JSON.parse(ev.target.result);
         const resumen = {};
         
         datos.forEach(d => {
-            if(d.fecha && d.prec) {
-                const m = d.fecha.substring(0, 7);
-                const v = parseFloat(d.prec.replace(',', '.')) || 0;
-                resumen[m] = (resumen[m] || 0) + v;
-            }
+            const m = d.fecha.substring(0, 7);
+            // Soporta p_mes (mensual) o prec (diario)
+            let rawVal = d.p_mes || d.prec || "0";
+            const v = parseFloat(String(rawVal).replace(',', '.')) || 0;
+            resumen[m] = (resumen[m] || 0) + v;
         });
 
         const labels = Object.keys(resumen).sort();
         const values = labels.map(l => resumen[l]);
         
-        // Formateamos para tabla y excel con COMA
-        datosExportar = labels.map(l => ({
+        datosExport = labels.map(l => ({
             "Mes": l,
-            "Precipitación (mm)": resumen[l].toLocaleString('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1})
+            "Lluvia (mm)": resumen[l].toLocaleString('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1})
         }));
 
         document.getElementById('panelAnalisis').style.display = "block";
         const cuerpo = document.getElementById('cuerpoTabla');
         cuerpo.innerHTML = "";
-        datosExportar.forEach(f => {
-            cuerpo.innerHTML += `<tr><td>${f.Mes}</td><td class="decimal-highlight">${f["Precipitación (mm)"]} mm</td></tr>`;
+        datosExport.forEach(f => {
+            cuerpo.innerHTML += `<tr><td>${f.Mes}</td><td>${f["Lluvia (mm)"]} mm</td></tr>`;
         });
 
         const ctx = document.getElementById('graficaLluvia').getContext('2d');
@@ -141,16 +119,18 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
             data: { 
                 labels: labels, 
                 datasets: [{ 
-                    label: 'Lluvia (mm)', 
+                    label: 'Precipitación (mm)', 
                     data: values, 
                     backgroundColor: '#3b82f6',
-                    borderRadius: 4
+                    borderRadius: 5
                 }] 
             },
             options: { 
                 responsive: true, 
                 maintainAspectRatio: false,
-                scales: { y: { ticks: { callback: v => v.toLocaleString('es-ES') } } }
+                scales: { 
+                    y: { ticks: { callback: v => v.toLocaleString('es-ES') + ' mm' } } 
+                }
             }
         });
     };
@@ -158,10 +138,10 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
 });
 
 document.getElementById('btnExcel').addEventListener('click', () => {
-    const ws = XLSX.utils.json_to_sheet(datosExportar);
+    const ws = XLSX.utils.json_to_sheet(datosExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Datos Lluvia");
-    XLSX.writeFile(wb, "Informe_Precipitacion_Regional.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Datos");
+    XLSX.writeFile(wb, "Informe_Historico_AEMET.xlsx");
 });
 </script>
 </body>
