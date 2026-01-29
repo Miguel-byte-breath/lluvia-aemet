@@ -12,26 +12,26 @@
         .header-step { border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px; color: #1e3a8a; font-weight: bold; }
         .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .btn-blue { background: #2563eb; color: white; }
-        .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; }
-        .btn:hover { opacity: 0.9; }
+        .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; font-size: 1.1em; }
         input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
         .result-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px; }
-        .chart-container { height: 400px; margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        .chart-header { text-align: center; margin-bottom: 10px; color: #1e40af; font-size: 1.3em; font-weight: bold; }
+        .chart-container { height: 400px; margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 0.9em; }
         th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
-        th { background: #f1f5f9; text-align: left; }
+        th { background: #f1f5f9; text-align: left; color: #475569; }
         td:first-child { text-align: left; font-weight: bold; }
         .fila-total { background-color: #fef3c7; font-weight: bold; color: #92400e; }
         .fila-media { background-color: #dcfce7; font-weight: bold; color: #166534; }
-        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-        @media (max-width: 600px) { .summary-grid { grid-template-columns: 1fr; } }
+        .grid-tablas { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        @media (max-width: 768px) { .grid-tablas { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="card">
-        <div class="header-step">📍 1. Localización de Estación</div>
+        <div class="header-step">📍 1. Localización de Parcela</div>
         <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
             Lat: <input type="number" id="userLat" value="39.443557" step="0.000001">
             Lon: <input type="number" id="userLon" value="-0.740434" step="0.000001">
@@ -41,27 +41,29 @@
     </div>
 
     <div class="card">
-        <div class="header-step">📊 2. Análisis Estadístico (Formato: 1 Decimal)</div>
-        <p>Carga tu archivo <code>datos_historicos.json</code>:</p>
+        <div class="header-step">📊 2. Análisis del Periodo Histórico</div>
+        <p>Selecciona tu archivo <code>datos_historicos.json</code>:</p>
         <input type="file" id="fileDatos" accept=".json">
         
         <div id="panelAnalisis" style="display:none">
-            <button id="btnExcel" class="btn btn-green">📥 Exportar Informe con Decimales Homogéneos (,0)</button>
+            <div id="tituloPeriodo" class="chart-header"></div>
             
             <div class="chart-container">
                 <canvas id="graficaLluvia"></canvas>
             </div>
 
-            <div class="summary-grid">
+            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Técnico en Excel</button>
+
+            <div class="grid-tablas">
                 <div>
-                    <h4 style="color:#1e3a8a">📅 Histórico por Meses</h4>
+                    <h4 style="color:#1e40af; border-bottom: 2px solid #bfdbfe;">📅 Registros Mensuales</h4>
                     <table>
-                        <thead><tr><th>Periodo</th><th>Lluvia (mm)</th></tr></thead>
+                        <thead><tr><th>Mes/Año</th><th>Lluvia (mm)</th></tr></thead>
                         <tbody id="cuerpoTabla"></tbody>
                     </table>
                 </div>
                 <div>
-                    <h4 style="color:#166534">📈 Medias del Periodo</h4>
+                    <h4 style="color:#166534; border-bottom: 2px solid #bbf7d0;">📈 Media del Periodo Obtenido</h4>
                     <table>
                         <thead><tr><th>Mes</th><th>Media (mm)</th></tr></thead>
                         <tbody id="cuerpoMedias"></tbody>
@@ -73,8 +75,8 @@
 </div>
 
 <script>
-// --- CONFIGURACIÓN REGIONAL ---
-const localFormat = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
+const formatReg = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
+const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 function aemetToDec(coord) {
     if(!coord) return 0;
@@ -95,93 +97,80 @@ function encontrarMasCercana() {
         });
         const res = document.getElementById('resBusqueda');
         res.style.display = "block";
-        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', localFormat)} km`;
+        res.innerHTML = `<strong>✅ Estación Localizada:</strong> ${mejor.nombre} (Cód: ${mejor.indicativo}) | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
     });
 }
 
 let miGrafica = null;
-let datosParaExcel = [];
-const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+let exportData = [];
 
 document.getElementById('fileDatos').addEventListener('change', function(e) {
     const reader = new FileReader();
     reader.onload = (ev) => {
-        const datosJSON = JSON.parse(ev.target.result);
+        const raw = JSON.parse(ev.target.result);
         
-        let datosProcesados = datosJSON.map(d => {
-            const partes = d.fecha.split('-');
-            return {
-                anio: parseInt(partes[0]),
-                mes: parseInt(partes[1]),
-                fechaOriginal: d.fecha,
-                valor: parseFloat(String(d.p_mes || d.prec || "0").replace(',', '.')) || 0
-            };
-        }).sort((a, b) => (a.anio !== b.anio) ? a.anio - b.anio : a.mes - b.mes);
+        // 1. Limpiar y Ordenar (Quitamos el mes 13 para la lógica de medias)
+        let proc = raw.map(d => {
+            const p = d.fecha.split('-');
+            return { anio: parseInt(p[0]), mes: parseInt(p[1]), fOriginal: d.fecha, valor: parseFloat(String(d.p_mes || d.prec || "0").replace(',', '.')) || 0 };
+        }).sort((a, b) => a.anio !== b.anio ? a.anio - b.anio : a.mes - b.mes);
+
+        // 2. Extraer Periodo para el Título
+        const mesesReales = proc.filter(d => d.mes !== 13);
+        const fIni = mesesReales[0].fOriginal;
+        const fFin = mesesReales[mesesReales.length - 1].fOriginal;
+        document.getElementById('tituloPeriodo').innerText = `Análisis de Precipitación: ${fIni} a ${fFin}`;
 
         const cuerpo = document.getElementById('cuerpoTabla');
-        const cuerpoMedias = document.getElementById('cuerpoMedias');
-        cuerpo.innerHTML = "";
-        cuerpoMedias.innerHTML = "";
+        const cuerpoMed = document.getElementById('cuerpoMedias');
+        cuerpo.innerHTML = ""; cuerpoMed.innerHTML = "";
         
-        const labelsGraf = [];
-        const valuesGraf = [];
-        const acumMedias = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
-        datosParaExcel = [];
+        const labels = []; const values = [];
+        const stats = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
+        exportData = [];
 
-        // 1. Procesar Historial con formato 1 decimal
-        datosProcesados.forEach(d => {
-            const valorFormateado = d.valor.toLocaleString('es-ES', localFormat);
-            
+        // 3. Procesar Histórico
+        proc.forEach(d => {
+            const vStr = d.valor.toLocaleString('es-ES', formatReg);
             if (d.mes === 13) {
-                cuerpo.innerHTML += `<tr class="fila-total"><td>TOTAL ${d.anio}</td><td>${valorFormateado} mm</td></tr>`;
-                datosParaExcel.push({ "Periodo": `TOTAL ${d.anio}`, "Precipitación (mm)": valorFormateado });
+                cuerpo.innerHTML += `<tr class="fila-total"><td>TOTAL ANUAL ${d.anio}</td><td>${vStr} mm</td></tr>`;
+                exportData.push({ "Periodo": `TOTAL ${d.anio}`, "Precipitación (mm)": vStr });
             } else {
-                labelsGraf.push(d.fechaOriginal);
-                valuesGraf.push(d.valor);
-                cuerpo.innerHTML += `<tr><td>${d.fechaOriginal}</td><td>${valorFormateado} mm</td></tr>`;
-                datosParaExcel.push({ "Periodo": d.fechaOriginal, "Precipitación (mm)": valorFormateado });
-                
-                acumMedias[d.mes].sum += d.valor;
-                acumMedias[d.mes].count += 1;
+                labels.push(d.fOriginal); values.push(d.valor);
+                cuerpo.innerHTML += `<tr><td>${d.fOriginal}</td><td>${vStr} mm</td></tr>`;
+                exportData.push({ "Periodo": d.fOriginal, "Precipitación (mm)": vStr });
+                stats[d.mes].sum += d.valor; stats[d.mes].count++;
             }
         });
 
-        // 2. Procesar Medias con formato 1 decimal
-        datosParaExcel.push({ "Periodo": "--- MEDIAS ---", "Precipitación (mm)": "" });
+        // 4. Procesar Medias del Periodo
+        exportData.push({ "Periodo": "--- MEDIAS DEL PERIODO ---", "Precipitación (mm)": "" });
         for (let i = 1; i <= 12; i++) {
-            if (acumMedias[i].count > 0) {
-                const media = acumMedias[i].sum / acumMedias[i].count;
-                const mediaStr = media.toLocaleString('es-ES', localFormat);
-                cuerpoMedias.innerHTML += `<tr class="fila-media"><td>${nombresMeses[i-1]}</td><td>${mediaStr} mm</td></tr>`;
-                datosParaExcel.push({ "Periodo": `MEDIA ${nombresMeses[i-1]}`, "Precipitación (mm)": mediaStr });
+            if (stats[i].count > 0) {
+                const media = stats[i].sum / stats[i].count;
+                const mStr = media.toLocaleString('es-ES', formatReg);
+                cuerpoMed.innerHTML += `<tr class="fila-media"><td>${mesesNombres[i-1]}</td><td>${mStr} mm</td></tr>`;
+                exportData.push({ "Periodo": `Media ${mesesNombres[i-1]}`, "Precipitación (mm)": mStr });
             }
         }
 
         document.getElementById('panelAnalisis').style.display = "block";
-
         const ctx = document.getElementById('graficaLluvia').getContext('2d');
         if(miGrafica) miGrafica.destroy();
         miGrafica = new Chart(ctx, {
             type: 'bar',
-            data: { 
-                labels: labelsGraf, 
-                datasets: [{ label: 'Precipitación (mm)', data: valuesGraf, backgroundColor: '#3b82f6' }] 
-            },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false,
-                scales: { y: { ticks: { callback: v => v.toLocaleString('es-ES', localFormat) } } }
-            }
+            data: { labels: labels, datasets: [{ label: 'Precipitación (mm)', data: values, backgroundColor: '#3b82f6', borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { callback: v => v.toLocaleString('es-ES', formatReg) + ' mm' } } } }
         });
     };
     reader.readAsText(e.target.files[0]);
 });
 
 document.getElementById('btnExcel').addEventListener('click', () => {
-    const ws = XLSX.utils.json_to_sheet(datosParaExcel);
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Informe");
-    XLSX.writeFile(wb, "Informe_Agro_Final.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Informe Agro");
+    XLSX.writeFile(wb, "Informe_Precipitacion_AEMET.xlsx");
 });
 </script>
 </body>
