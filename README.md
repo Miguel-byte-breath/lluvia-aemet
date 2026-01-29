@@ -25,7 +25,7 @@ La herramienta aplica criterios de limpieza y ordenación para asegurar la integ
    
    $$\mu_{mes} = \frac{\sum P_{i}}{n}$$
    
-   *Donde $$P_i$$ es la precipitación del mes en el año $i$ y $n$ el número de años analizados.*
+   *Donde **P<sub>i</sub>** representa la precipitación del mes en el año **i**, y **n** el número total de años analizados.*
 
 ## 🛠️ Stack Tecnológico
 
