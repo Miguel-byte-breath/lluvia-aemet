@@ -10,14 +10,13 @@
         .container { max-width: 1000px; margin: auto; }
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .header-step { border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px; color: #1e3a8a; font-weight: bold; }
-        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
         .btn-blue { background: #2563eb; color: white; }
         .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; }
-        .btn:hover { opacity: 0.9; }
         input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
         .result-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px; }
-        .chart-container { height: 400px; margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; }
+        .chart-container { height: 400px; margin-top: 20px; border: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
         th { background: #f1f5f9; text-align: left; }
         td:first-child { text-align: left; font-weight: bold; }
@@ -27,7 +26,7 @@
 
 <div class="container">
     <div class="card">
-        <div class="header-step">📍 1. Localizar Estación por Coordenadas</div>
+        <div class="header-step">📍 1. Localizar Estación</div>
         <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
             Lat: <input type="number" id="userLat" value="39.443557" step="0.000001">
             Lon: <input type="number" id="userLon" value="-0.740434" step="0.000001">
@@ -37,17 +36,17 @@
     </div>
 
     <div class="card">
-        <div class="header-step">📊 2. Análisis y Exportación (Formato Regional)</div>
-        <p>Carga el archivo <code>datos_historicos.json</code> que has bajado de Postman:</p>
+        <div class="header-step">📊 2. Cargar Datos Históricos</div>
+        <p>Carga el archivo <code>datos_historicos.json</code>:</p>
         <input type="file" id="fileDatos" accept=".json">
         
         <div id="panelAnalisis" style="display:none">
-            <button id="btnExcel" class="btn btn-green">📥 Descargar Resumen en EXCEL (Decimales con Coma)</button>
+            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe en EXCEL</button>
             <div class="chart-container">
                 <canvas id="graficaLluvia"></canvas>
             </div>
-            <table id="tablaResumen">
-                <thead><tr><th>Periodo</th><th>Precipitación Acumulada (mm)</th></tr></thead>
+            <table>
+                <thead><tr><th>Periodo (Año-Mes)</th><th>Precipitación (mm)</th></tr></thead>
                 <tbody id="cuerpoTabla"></tbody>
             </table>
         </div>
@@ -55,7 +54,7 @@
 </div>
 
 <script>
-// --- LÓGICA DE BÚSQUEDA ---
+// --- BUSCADOR ---
 function aemetToDec(coord) {
     if(!coord) return 0;
     const dir = coord.slice(-1), n = coord.slice(0, -1);
@@ -75,11 +74,11 @@ function encontrarMasCercana() {
         });
         const res = document.getElementById('resBusqueda');
         res.style.display = "block";
-        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Cód:</strong> <span style="color:#e11d48">${mejor.indicativo}</span> | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES')} km`;
+        res.innerHTML = `<strong>Estación:</strong> ${mejor.nombre} | <strong>Cód:</strong> <span style="color:red">${mejor.indicativo}</span>`;
     });
 }
 
-// --- PROCESADOR MULTI-FORMATO ---
+// --- PROCESADOR DE DATOS ---
 let miGrafica = null;
 let datosExport = [];
 
@@ -90,11 +89,16 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
         const resumen = {};
         
         datos.forEach(d => {
-            const m = d.fecha.substring(0, 7);
-            // Soporta p_mes (mensual) o prec (diario)
+            if (!d.fecha || d.fecha.endsWith("-13")) return; // Ignoramos el resumen anual (mes 13)
+
+            // Normalizamos la fecha para que el orden sea correcto (2023-1 -> 2023-01)
+            let partes = d.fecha.split('-');
+            let anio = partes[0];
+            let mes = partes[1].padStart(2, '0');
+            let fechaClave = `${anio}-${mes}`;
+
             let rawVal = d.p_mes || d.prec || "0";
-            const v = parseFloat(String(rawVal).replace(',', '.')) || 0;
-            resumen[m] = (resumen[m] || 0) + v;
+            resumen[fechaClave] = parseFloat(String(rawVal).replace(',', '.')) || 0;
         });
 
         const labels = Object.keys(resumen).sort();
@@ -118,19 +122,12 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
             type: 'bar',
             data: { 
                 labels: labels, 
-                datasets: [{ 
-                    label: 'Precipitación (mm)', 
-                    data: values, 
-                    backgroundColor: '#3b82f6',
-                    borderRadius: 5
-                }] 
+                datasets: [{ label: 'Precipitación Mensual (mm)', data: values, backgroundColor: '#3b82f6' }] 
             },
             options: { 
                 responsive: true, 
                 maintainAspectRatio: false,
-                scales: { 
-                    y: { ticks: { callback: v => v.toLocaleString('es-ES') + ' mm' } } 
-                }
+                scales: { y: { ticks: { callback: v => v.toLocaleString('es-ES') + ' mm' } } }
             }
         });
     };
@@ -141,7 +138,7 @@ document.getElementById('btnExcel').addEventListener('click', () => {
     const ws = XLSX.utils.json_to_sheet(datosExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Datos");
-    XLSX.writeFile(wb, "Informe_Historico_AEMET.xlsx");
+    XLSX.writeFile(wb, "Informe_Lluvia_Turis.xlsx");
 });
 </script>
 </body>
