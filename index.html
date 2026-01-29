@@ -2,69 +2,62 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Control de Lluvia - Agro</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <title>Dashboard Agronómico - Chinchilla</title>
+    <script src="chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f0f2f5; }
-        .card { max-width: 850px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { color: #1e40af; text-align: center; margin-bottom: 5px; }
-        h3 { color: #64748b; text-align: center; margin-top: 0; font-weight: 400; }
-        #aviso-error { color: #b91c1c; background: #fef2f2; padding: 15px; border-radius: 8px; display: none; margin: 20px 0; border: 1px solid #fecaca; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 30px; background-color: #f8fafc; color: #1e293b; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        h1 { color: #0f172a; text-align: center; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+        #error-display { color: #991b1b; background: #fef2f2; padding: 10px; border-radius: 6px; display: none; margin: 15px 0; border: 1px solid #fecaca; text-align: center; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Registro de Precipitación</h1>
-        <h3 id="nombreEstacion">Cargando datos de AEMET...</h3>
-        
-        <div id="aviso-error"></div>
-        
-        <div style="height: 400px;">
+    <div class="container">
+        <h1>Análisis de Precipitación Mensual</h1>
+        <div id="error-display"></div>
+        <div style="height: 400px; margin-top: 20px;">
             <canvas id="graficaLluvia"></canvas>
         </div>
     </div>
 
     <script>
-        const errorBox = document.getElementById('aviso-error');
+        const errorDiv = document.getElementById('error-display');
+
+        // Comprobación de que la librería está cargada
+        if (typeof Chart === 'undefined') {
+            errorDiv.style.display = 'block';
+            errorDiv.innerText = "⚠️ Error: La pieza 'chart.js' no se ha cargado correctamente en el navegador.";
+        }
 
         fetch('datos_clima.json')
             .then(res => {
-                if(!res.ok) throw new Error("No se encuentra el archivo 'datos_clima.json'. Revisa el nombre en GitHub.");
+                if(!res.ok) throw new Error("No encuentro el archivo 'datos_clima.json'. Revisa el nombre.");
                 return res.json();
             })
             .then(datos => {
-                // Sacamos el nombre de la estación del primer registro
-                document.getElementById('nombreEstacion').innerText = datos[0].nombre + " (" + datos[0].provincia + ")";
-
-                const acumulado = {};
-                datos.forEach(dia => {
-                    const mes = dia.fecha.substring(0, 7); // "2022-01"
-                    // Limpiamos la coma decimal de AEMET
-                    const valor = parseFloat(dia.prec.replace(',', '.')) || 0;
-                    acumulado[mes] = (acumulado[mes] || 0) + valor;
+                const meses = {};
+                datos.forEach(d => {
+                    const mes = d.fecha.substring(0, 7);
+                    const lluvia = parseFloat(d.prec.replace(',', '.')) || 0;
+                    meses[mes] = (meses[mes] || 0) + lluvia;
                 });
 
                 new Chart(document.getElementById('graficaLluvia'), {
                     type: 'bar',
                     data: {
-                        labels: Object.keys(acumulado),
+                        labels: Object.keys(meses),
                         datasets: [{
-                            label: 'Lluvia total por mes (mm)',
-                            data: Object.values(acumulado).map(v => v.toFixed(1)),
-                            backgroundColor: '#3b82f6',
-                            borderRadius: 5
+                            label: 'Lluvia acumulada (mm)',
+                            data: Object.values(meses).map(v => v.toFixed(1)),
+                            backgroundColor: '#3b82f6'
                         }]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: { y: { beginAtZero: true } }
-                    }
+                    options: { responsive: true, maintainAspectRatio: false }
                 });
             })
             .catch(err => {
-                errorBox.style.display = 'block';
-                errorBox.innerText = "Error: " + err.message;
+                errorDiv.style.display = 'block';
+                errorDiv.innerText = "⚠️ Error: " + err.message;
             });
     </script>
 </body>
