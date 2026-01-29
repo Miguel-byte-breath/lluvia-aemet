@@ -41,12 +41,12 @@
     </div>
 
     <div class="card">
-        <div class="header-step">📊 2. Análisis Estadístico Histórico</div>
-        <p>Carga el JSON con varios años de datos:</p>
+        <div class="header-step">📊 2. Análisis Estadístico (Formato: 1 Decimal)</div>
+        <p>Carga tu archivo <code>datos_historicos.json</code>:</p>
         <input type="file" id="fileDatos" accept=".json">
         
         <div id="panelAnalisis" style="display:none">
-            <button id="btnExcel" class="btn btn-green">📥 Exportar Informe Completo (con Medias) a Excel</button>
+            <button id="btnExcel" class="btn btn-green">📥 Exportar Informe con Decimales Homogéneos (,0)</button>
             
             <div class="chart-container">
                 <canvas id="graficaLluvia"></canvas>
@@ -54,15 +54,15 @@
 
             <div class="summary-grid">
                 <div>
-                    <h4 style="color:#1e3a8a">📅 Histórico de Precipitaciones</h4>
-                    <table id="tablaHistorica">
+                    <h4 style="color:#1e3a8a">📅 Histórico por Meses</h4>
+                    <table>
                         <thead><tr><th>Periodo</th><th>Lluvia (mm)</th></tr></thead>
                         <tbody id="cuerpoTabla"></tbody>
                     </table>
                 </div>
                 <div>
-                    <h4 style="color:#166534">📈 Medias Mensuales (del periodo)</h4>
-                    <table id="tablaMedias">
+                    <h4 style="color:#166534">📈 Medias del Periodo</h4>
+                    <table>
                         <thead><tr><th>Mes</th><th>Media (mm)</th></tr></thead>
                         <tbody id="cuerpoMedias"></tbody>
                     </table>
@@ -73,7 +73,9 @@
 </div>
 
 <script>
-// --- BUSCADOR ---
+// --- CONFIGURACIÓN REGIONAL ---
+const localFormat = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
+
 function aemetToDec(coord) {
     if(!coord) return 0;
     const dir = coord.slice(-1), n = coord.slice(0, -1);
@@ -93,11 +95,10 @@ function encontrarMasCercana() {
         });
         const res = document.getElementById('resBusqueda');
         res.style.display = "block";
-        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Código:</strong> <span style="color:red">${mejor.indicativo}</span>`;
+        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', localFormat)} km`;
     });
 }
 
-// --- PROCESADOR MATEMÁTICO ---
 let miGrafica = null;
 let datosParaExcel = [];
 const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -127,31 +128,30 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
         const acumMedias = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
         datosParaExcel = [];
 
-        // 1. Procesar Historial
+        // 1. Procesar Historial con formato 1 decimal
         datosProcesados.forEach(d => {
-            const valorStr = d.valor.toLocaleString('es-ES', {minimumFractionDigits: 1});
+            const valorFormateado = d.valor.toLocaleString('es-ES', localFormat);
             
             if (d.mes === 13) {
-                cuerpo.innerHTML += `<tr class="fila-total"><td>TOTAL ${d.anio}</td><td>${valorStr} mm</td></tr>`;
-                datosParaExcel.push({ "Periodo": `TOTAL ${d.anio}`, "Precipitación (mm)": valorStr });
+                cuerpo.innerHTML += `<tr class="fila-total"><td>TOTAL ${d.anio}</td><td>${valorFormateado} mm</td></tr>`;
+                datosParaExcel.push({ "Periodo": `TOTAL ${d.anio}`, "Precipitación (mm)": valorFormateado });
             } else {
                 labelsGraf.push(d.fechaOriginal);
                 valuesGraf.push(d.valor);
-                cuerpo.innerHTML += `<tr><td>${d.fechaOriginal}</td><td>${valorStr} mm</td></tr>`;
-                datosParaExcel.push({ "Periodo": d.fechaOriginal, "Precipitación (mm)": valorStr });
+                cuerpo.innerHTML += `<tr><td>${d.fechaOriginal}</td><td>${valorFormateado} mm</td></tr>`;
+                datosParaExcel.push({ "Periodo": d.fechaOriginal, "Precipitación (mm)": valorFormateado });
                 
-                // Acumular para medias
                 acumMedias[d.mes].sum += d.valor;
                 acumMedias[d.mes].count += 1;
             }
         });
 
-        // 2. Procesar Medias Mensuales
-        datosParaExcel.push({ "Periodo": "--- MEDIAS MENSUALES ---", "Precipitación (mm)": "" });
+        // 2. Procesar Medias con formato 1 decimal
+        datosParaExcel.push({ "Periodo": "--- MEDIAS ---", "Precipitación (mm)": "" });
         for (let i = 1; i <= 12; i++) {
             if (acumMedias[i].count > 0) {
                 const media = acumMedias[i].sum / acumMedias[i].count;
-                const mediaStr = media.toLocaleString('es-ES', {minimumFractionDigits: 1});
+                const mediaStr = media.toLocaleString('es-ES', localFormat);
                 cuerpoMedias.innerHTML += `<tr class="fila-media"><td>${nombresMeses[i-1]}</td><td>${mediaStr} mm</td></tr>`;
                 datosParaExcel.push({ "Periodo": `MEDIA ${nombresMeses[i-1]}`, "Precipitación (mm)": mediaStr });
             }
@@ -159,13 +159,19 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
 
         document.getElementById('panelAnalisis').style.display = "block";
 
-        // 3. Gráfica
         const ctx = document.getElementById('graficaLluvia').getContext('2d');
         if(miGrafica) miGrafica.destroy();
         miGrafica = new Chart(ctx, {
             type: 'bar',
-            data: { labels: labelsGraf, datasets: [{ label: 'Lluvia Mensual (mm)', data: valuesGraf, backgroundColor: '#3b82f6' }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: { 
+                labels: labelsGraf, 
+                datasets: [{ label: 'Precipitación (mm)', data: valuesGraf, backgroundColor: '#3b82f6' }] 
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => v.toLocaleString('es-ES', localFormat) } } }
+            }
         });
     };
     reader.readAsText(e.target.files[0]);
@@ -174,8 +180,8 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
 document.getElementById('btnExcel').addEventListener('click', () => {
     const ws = XLSX.utils.json_to_sheet(datosParaExcel);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Estadísticas");
-    XLSX.writeFile(wb, "Informe_Agro_Estadistico.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Informe");
+    XLSX.writeFile(wb, "Informe_Agro_Final.xlsx");
 });
 </script>
 </body>
