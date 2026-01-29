@@ -2,45 +2,64 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Análisis de Lluvia - AEMET</title>
-   <script src="chart.js"></script>
+    <title>Análisis Agro-Climático</title>
+    <script src="chart.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #f4f7f6; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; text-align: center; margin-bottom: 10px; }
-        h2 { color: #7f8c8d; text-align: center; font-weight: normal; font-size: 1.1em; margin-top: 0; }
-        #mensaje-error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; display: none; margin-bottom: 20px; text-align: center; }
-        .chart-container { position: relative; height: 400px; width: 100%; }
+        body { font-family: sans-serif; margin: 20px; background-color: #f0f4f8; }
+        .box { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; border: 1px solid #d1d9e0; }
+        h1 { color: #1a5f7a; text-align: center; }
+        #error-log { color: #a94442; background: #f2dede; padding: 10px; border-radius: 5px; display: none; margin-bottom: 20px; border: 1px solid #ebccd1; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Análisis Pluviométrico</h1>
-        <h2 id="titulo-estacion">Cargando datos de la estación...</h2>
-        
-        <div id="mensaje-error"></div>
-        
-        <div class="chart-container">
-            <canvas id="graficaLluvia"></canvas>
-        </div>
+    <div class="box">
+        <h1>Lluvia Mensual - Estación Chinchilla</h1>
+        <div id="error-log"></div>
+        <canvas id="grafica"></canvas>
     </div>
 
     <script>
-        const errorDiv = document.getElementById('mensaje-error');
-        const tituloEstacion = document.getElementById('titulo-estacion');
+        const log = document.getElementById('error-log');
 
-        // Intentamos leer el archivo de datos
+        // Función para mostrar errores en pantalla
+        function mostrarError(txt) {
+            log.style.display = 'block';
+            log.innerHTML += `<p>⚠️ ${txt}</p>`;
+        }
+
+        // 1. Verificar si la librería Chart.js se ha cargado
+        if (typeof Chart === 'undefined') {
+            mostrarError("La librería 'chart.js' no se ha cargado. Verifica que subiste el archivo 'chart.js' a GitHub.");
+        }
+
+        // 2. Cargar los datos
         fetch('datos_clima.json')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('No se encontró el archivo "datos_clima.json". Verifica que el nombre sea exacto en GitHub.');
-                }
-                return response.json();
+            .then(res => {
+                if(!res.ok) throw new Error("No encuentro el archivo 'datos_clima.json'.");
+                return res.json();
             })
             .then(datos => {
-                if (!Array.isArray(datos) || datos.length === 0) {
-                    throw new Error('El archivo JSON está vacío o no tiene el formato correcto.');
-                }
+                const meses = {};
+                datos.forEach(d => {
+                    const m = d.fecha.substring(0, 7);
+                    // Convertimos la coma en punto para que el ordenador sepa sumar
+                    const lluvia = parseFloat(d.prec.replace(',', '.')) || 0;
+                    meses[m] = (meses[m] || 0) + lluvia;
+                });
 
-                // Ponemos el nombre de la estación en el título
-                tituloEstacion.innerText = "Estación: " + datos[0].nombre + " (" + datos
+                new Chart(document.getElementById('grafica'), {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(meses),
+                        datasets: [{
+                            label: 'Lluvia Total (mm)',
+                            data: Object.values(meses).map(v => v.toFixed(1)),
+                            backgroundColor: '#3498db'
+                        }]
+                    }
+                });
+            })
+            .catch(err => mostrarError(err.message));
+    </script>
+</body>
+</html>
