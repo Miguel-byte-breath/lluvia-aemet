@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Análisis de Lluvia - AEMET</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f7f6; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Precipitación Mensual - Estación 8177A</h1>
+        <canvas id="graficaLluvia"></canvas>
+    </div>
+
+    <script>
+        // 1. Leer el archivo que subiste
+        fetch('datos_clima.json')
+            .then(response => response.json())
+            .then(datos => {
+                const resumenMensual = {};
+
+                datos.forEach(dia => {
+                    // Extraemos el año y mes (ej: "2022-01")
+                    const mes = dia.fecha.substring(0, 7); 
+                    // Convertimos la lluvia "0,2" a número 0.2
+                    const lluvia = parseFloat(dia.prec.replace(',', '.')) || 0;
+
+                    if (!resumenMensual[mes]) resumenMensual[mes] = 0;
+                    resumenMensual[mes] += lluvia;
+                });
+
+                // 2. Preparar los datos para la gráfica
+                const etiquetas = Object.keys(resumenMensual);
+                const valores = Object.values(resumenMensual);
+
+                // 3. Dibujar la gráfica
+                const ctx = document.getElementById('graficaLluvia').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: etiquetas,
+                        datasets: [{
+                            label: 'Precipitación Total (mm)',
+                            data: valores,
+                            backgroundColor: '#3498db'
+                        }]
+                    },
+                    options: {
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            });
+    </script>
+</body>
+</html>
