@@ -17,8 +17,8 @@
         .result-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px; }
         .chart-header { text-align: center; margin-bottom: 10px; color: #1e40af; font-size: 1.3em; font-weight: bold; }
         .chart-container { height: 400px; margin-bottom: 30px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 0.9em; }
-        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 0.85em; }
+        th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: right; }
         th { background: #f1f5f9; text-align: left; color: #475569; }
         td:first-child { text-align: left; font-weight: bold; }
         .fila-total { background-color: #fef3c7; font-weight: bold; color: #92400e; }
@@ -41,8 +41,8 @@
     </div>
 
     <div class="card">
-        <div class="header-step">📊 2. Análisis del Periodo Histórico</div>
-        <p>Selecciona tu archivo <code>datos_historicos.json</code>:</p>
+        <div class="header-step">📊 2. Gráfico de Medias Mensuales</div>
+        <p>Carga tu archivo <code>datos_historicos.json</code>:</p>
         <input type="file" id="fileDatos" accept=".json">
         
         <div id="panelAnalisis" style="display:none">
@@ -52,21 +52,21 @@
                 <canvas id="graficaLluvia"></canvas>
             </div>
 
-            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Técnico en Excel</button>
+            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Completo en Excel</button>
 
             <div class="grid-tablas">
                 <div>
-                    <h4 style="color:#1e40af; border-bottom: 2px solid #bfdbfe;">📅 Registros Mensuales</h4>
-                    <table>
-                        <thead><tr><th>Mes/Año</th><th>Lluvia (mm)</th></tr></thead>
-                        <tbody id="cuerpoTabla"></tbody>
-                    </table>
-                </div>
-                <div>
-                    <h4 style="color:#166534; border-bottom: 2px solid #bbf7d0;">📈 Media del Periodo Obtenido</h4>
+                    <h4 style="color:#166534; border-bottom: 2px solid #bbf7d0;">📈 Valores Medios Calculados</h4>
                     <table>
                         <thead><tr><th>Mes</th><th>Media (mm)</th></tr></thead>
                         <tbody id="cuerpoMedias"></tbody>
+                    </table>
+                </div>
+                <div>
+                    <h4 style="color:#1e40af; border-bottom: 2px solid #bfdbfe;">📅 Histórico Detallado</h4>
+                    <table>
+                        <thead><tr><th>Año-Mes</th><th>Lluvia (mm)</th></tr></thead>
+                        <tbody id="cuerpoTabla"></tbody>
                     </table>
                 </div>
             </div>
@@ -97,7 +97,7 @@ function encontrarMasCercana() {
         });
         const res = document.getElementById('resBusqueda');
         res.style.display = "block";
-        res.innerHTML = `<strong>✅ Estación Localizada:</strong> ${mejor.nombre} (Cód: ${mejor.indicativo}) | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
+        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
     });
 }
 
@@ -109,58 +109,73 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
     reader.onload = (ev) => {
         const raw = JSON.parse(ev.target.result);
         
-        // 1. Limpiar y Ordenar (Quitamos el mes 13 para la lógica de medias)
+        // 1. Procesar y ordenar datos
         let proc = raw.map(d => {
             const p = d.fecha.split('-');
             return { anio: parseInt(p[0]), mes: parseInt(p[1]), fOriginal: d.fecha, valor: parseFloat(String(d.p_mes || d.prec || "0").replace(',', '.')) || 0 };
         }).sort((a, b) => a.anio !== b.anio ? a.anio - b.anio : a.mes - b.mes);
 
-        // 2. Extraer Periodo para el Título
+        // 2. Establecer Periodo en el Título
         const mesesReales = proc.filter(d => d.mes !== 13);
-        const fIni = mesesReales[0].fOriginal;
-        const fFin = mesesReales[mesesReales.length - 1].fOriginal;
-        document.getElementById('tituloPeriodo').innerText = `Análisis de Precipitación: ${fIni} a ${fFin}`;
+        const anioIni = mesesReales[0].anio;
+        const anioFin = mesesReales[mesesReales.length - 1].anio;
+        document.getElementById('tituloPeriodo').innerText = `Medias Mensuales de Precipitación (${anioIni} - ${anioFin})`;
 
         const cuerpo = document.getElementById('cuerpoTabla');
         const cuerpoMed = document.getElementById('cuerpoMedias');
         cuerpo.innerHTML = ""; cuerpoMed.innerHTML = "";
         
-        const labels = []; const values = [];
         const stats = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
         exportData = [];
 
-        // 3. Procesar Histórico
+        // 3. Llenar Histórico y Acumular para Medias
         proc.forEach(d => {
             const vStr = d.valor.toLocaleString('es-ES', formatReg);
             if (d.mes === 13) {
-                cuerpo.innerHTML += `<tr class="fila-total"><td>TOTAL ANUAL ${d.anio}</td><td>${vStr} mm</td></tr>`;
-                exportData.push({ "Periodo": `TOTAL ${d.anio}`, "Precipitación (mm)": vStr });
+                cuerpo.innerHTML += `<tr class="fila-total"><td>TOTAL ${d.anio}</td><td>${vStr} mm</td></tr>`;
+                exportData.push({ "Periodo": `TOTAL ANUAL ${d.anio}`, "Precipitación (mm)": vStr });
             } else {
-                labels.push(d.fOriginal); values.push(d.valor);
                 cuerpo.innerHTML += `<tr><td>${d.fOriginal}</td><td>${vStr} mm</td></tr>`;
                 exportData.push({ "Periodo": d.fOriginal, "Precipitación (mm)": vStr });
-                stats[d.mes].sum += d.valor; stats[d.mes].count++;
+                stats[d.mes].sum += d.valor; 
+                stats[d.mes].count++;
             }
         });
 
-        // 4. Procesar Medias del Periodo
-        exportData.push({ "Periodo": "--- MEDIAS DEL PERIODO ---", "Precipitación (mm)": "" });
+        // 4. Calcular Valores para el Gráfico y Tabla de Medias
+        const valoresMediosGrafico = [];
+        exportData.push({ "Periodo": "--- RESUMEN DE MEDIAS ---", "Precipitación (mm)": "" });
+        
         for (let i = 1; i <= 12; i++) {
-            if (stats[i].count > 0) {
-                const media = stats[i].sum / stats[i].count;
-                const mStr = media.toLocaleString('es-ES', formatReg);
-                cuerpoMed.innerHTML += `<tr class="fila-media"><td>${mesesNombres[i-1]}</td><td>${mStr} mm</td></tr>`;
-                exportData.push({ "Periodo": `Media ${mesesNombres[i-1]}`, "Precipitación (mm)": mStr });
-            }
+            const media = stats[i].count > 0 ? stats[i].sum / stats[i].count : 0;
+            valoresMediosGrafico.push(media);
+            
+            const mStr = media.toLocaleString('es-ES', formatReg);
+            cuerpoMed.innerHTML += `<tr class="fila-media"><td>${mesesNombres[i-1]}</td><td>${mStr} mm</td></tr>`;
+            exportData.push({ "Periodo": `Media ${mesesNombres[i-1]}`, "Precipitación (mm)": mStr });
         }
 
         document.getElementById('panelAnalisis').style.display = "block";
+
+        // 5. Gráfica de Medias (Enero a Diciembre)
         const ctx = document.getElementById('graficaLluvia').getContext('2d');
         if(miGrafica) miGrafica.destroy();
         miGrafica = new Chart(ctx, {
             type: 'bar',
-            data: { labels: labels, datasets: [{ label: 'Precipitación (mm)', data: values, backgroundColor: '#3b82f6', borderRadius: 4 }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { callback: v => v.toLocaleString('es-ES', formatReg) + ' mm' } } } }
+            data: { 
+                labels: mesesNombres, 
+                datasets: [{ 
+                    label: `Media Mensual (${anioIni}-${anioFin})`, 
+                    data: valoresMediosGrafico, 
+                    backgroundColor: '#16a34a', // Cambiado a verde para diferenciar de la serie histórica
+                    borderRadius: 6 
+                }] 
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => v.toLocaleString('es-ES', formatReg) + ' mm' } } }
+            }
         });
     };
     reader.readAsText(e.target.files[0]);
@@ -169,8 +184,8 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
 document.getElementById('btnExcel').addEventListener('click', () => {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Informe Agro");
-    XLSX.writeFile(wb, "Informe_Precipitacion_AEMET.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Informe Climatológico");
+    XLSX.writeFile(wb, "Informe_Agro_Medias_Mensuales.xlsx");
 });
 </script>
 </body>
