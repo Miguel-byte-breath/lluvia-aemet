@@ -6,54 +6,41 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: sans-serif; margin: 20px; background-color: #f4f7f6; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; text-align: center; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 10px; }
+        h2 { color: #7f8c8d; text-align: center; font-weight: normal; font-size: 1.1em; margin-top: 0; }
+        #mensaje-error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; display: none; margin-bottom: 20px; text-align: center; }
+        .chart-container { position: relative; height: 400px; width: 100%; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Precipitación Mensual - Estación 8177A</h1>
-        <canvas id="graficaLluvia"></canvas>
+        <h1>Análisis Pluviométrico</h1>
+        <h2 id="titulo-estacion">Cargando datos de la estación...</h2>
+        
+        <div id="mensaje-error"></div>
+        
+        <div class="chart-container">
+            <canvas id="graficaLluvia"></canvas>
+        </div>
     </div>
 
     <script>
-        // 1. Leer el archivo que subiste
+        const errorDiv = document.getElementById('mensaje-error');
+        const tituloEstacion = document.getElementById('titulo-estacion');
+
+        // Intentamos leer el archivo de datos
         fetch('datos_clima.json')
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('No se encontró el archivo "datos_clima.json". Verifica que el nombre sea exacto en GitHub.');
+                }
+                return response.json();
+            })
             .then(datos => {
-                const resumenMensual = {};
+                if (!Array.isArray(datos) || datos.length === 0) {
+                    throw new Error('El archivo JSON está vacío o no tiene el formato correcto.');
+                }
 
-                datos.forEach(dia => {
-                    // Extraemos el año y mes (ej: "2022-01")
-                    const mes = dia.fecha.substring(0, 7); 
-                    // Convertimos la lluvia "0,2" a número 0.2
-                    const lluvia = parseFloat(dia.prec.replace(',', '.')) || 0;
-
-                    if (!resumenMensual[mes]) resumenMensual[mes] = 0;
-                    resumenMensual[mes] += lluvia;
-                });
-
-                // 2. Preparar los datos para la gráfica
-                const etiquetas = Object.keys(resumenMensual);
-                const valores = Object.values(resumenMensual);
-
-                // 3. Dibujar la gráfica
-                const ctx = document.getElementById('graficaLluvia').getContext('2d');
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: etiquetas,
-                        datasets: [{
-                            label: 'Precipitación Total (mm)',
-                            data: valores,
-                            backgroundColor: '#3498db'
-                        }]
-                    },
-                    options: {
-                        scales: { y: { beginAtZero: true } }
-                    }
-                });
-            });
-    </script>
-</body>
-</html>
+                // Ponemos el nombre de la estación en el título
+                tituloEstacion.innerText = "Estación: " + datos[0].nombre + " (" + datos
