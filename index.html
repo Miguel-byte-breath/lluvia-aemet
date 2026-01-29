@@ -2,20 +2,35 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Análisis de Lluvia - Chinchilla</title>
+    <title>Dashboard AEMET - Estación</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f4f7f9; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-        #error-msg { color: #721c24; background: #f8d7da; padding: 10px; border-radius: 5px; display: none; margin: 15px 0; border: 1px solid #f5c6cb; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f8fafc; color: #1e293b; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        
+        /* Estilo para el encabezado */
+        .header { border-bottom: 3px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px; text-align: center; }
+        h1 { margin: 0; color: #0f172a; font-size: 1.8em; }
+        .station-info { color: #3b82f6; font-size: 1.2em; font-weight: bold; margin-top: 5px; }
+        .aemet-code { font-size: 0.8em; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; margin-left: 10px; border: 1px solid #e2e8f0; }
+
+        #error-msg { color: #b91c1c; background: #fef2f2; padding: 15px; border-radius: 8px; display: none; margin: 20px 0; border: 1px solid #fecaca; }
+        .chart-box { height: 450px; width: 100%; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Precipitación Mensual Acumulada</h1>
+        <div class="header">
+            <h1>Registro Pluviométrico Mensual</h1>
+            <div id="info-estacion" class="station-info">
+                <span id="txtNombre">Cargando estación...</span>
+                <span id="txtCodigo" class="aemet-code">---</span>
+            </div>
+        </div>
+        
         <div id="error-msg"></div>
-        <div style="height: 400px; margin-top: 20px;">
+        
+        <div class="chart-box">
             <canvas id="graficaLluvia"></canvas>
         </div>
     </div>
@@ -25,28 +40,26 @@
 
         fetch('datos_clima.json')
             .then(res => {
-                if(!res.ok) throw new Error("No se encuentra 'datos_clima.json'. Verifica el nombre.");
+                if(!res.ok) throw new Error("No se encuentra el archivo 'datos_clima.json'.");
                 return res.json();
             })
             .then(datos => {
-                const meses = {};
+                if (datos.length > 0) {
+                    // Visualizamos el Nombre y el Código de AEMET
+                    document.getElementById('txtNombre').innerText = datos[0].nombre;
+                    document.getElementById('txtCodigo').innerText = "Cód. AEMET: " + datos[0].indicativo;
+                }
 
+                const meses = {};
                 datos.forEach(d => {
-                    // VERIFICACIÓN DE SEGURIDAD: Solo procesamos si existe fecha y precipitación
-                    if (d.fecha && d.prec !== undefined && d.prec !== null) {
-                        const mes = d.fecha.substring(0, 7); // Extrae el año-mes
-                        
-                        // Convertimos a texto por seguridad y cambiamos coma por punto
-                        let precTexto = String(d.prec).replace(',', '.');
-                        
-                        // Si es "Ip" (inapreciable) o no es un número, ponemos 0
-                        const lluvia = parseFloat(precTexto) || 0;
-                        
+                    if (d.fecha && d.prec !== undefined) {
+                        const mes = d.fecha.substring(0, 7);
+                        let valorLluvia = String(d.prec).replace(',', '.');
+                        const lluvia = parseFloat(valorLluvia) || 0;
                         meses[mes] = (meses[mes] || 0) + lluvia;
                     }
                 });
 
-                // Ordenamos los meses para que la gráfica salga en orden cronológico
                 const etiquetas = Object.keys(meses).sort();
                 const valores = etiquetas.map(m => meses[m].toFixed(1));
 
@@ -55,24 +68,28 @@
                     data: {
                         labels: etiquetas,
                         datasets: [{
-                            label: 'Lluvia acumulada (mm)',
+                            label: 'Lluvia total (mm)',
                             data: valores,
-                            backgroundColor: '#3498db',
-                            borderColor: '#2980b9',
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: '#2563eb',
                             borderWidth: 1
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: { y: { beginAtZero: true } }
+                        plugins: {
+                            legend: { position: 'top' }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Milímetros (mm)' } }
+                        }
                     }
                 });
             })
             .catch(err => {
                 errorDiv.style.display = 'block';
                 errorDiv.innerText = "⚠️ Error: " + err.message;
-                console.error(err);
             });
     </script>
 </body>
