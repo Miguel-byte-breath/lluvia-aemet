@@ -103,7 +103,7 @@ function encontrarMasCercana() {
         });
         const res = document.getElementById('resBusqueda');
         res.style.display = "block";
-        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Cód:</strong> <span style="color:#e11d48">${mejor.indicativo}</span> | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
+        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Cód:</strong> <span style="color:#e11d48; font-weight:bold">${mejor.indicativo}</span> | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
     });
 }
 
@@ -129,7 +129,7 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
         const cuerpoMed = document.getElementById('cuerpoMedias');
         cuerpo.innerHTML = ""; cuerpoMed.innerHTML = "";
         
-        const stats = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
+        const stats = Array(14).fill(0).map(() => ({ sum: 0, count: 0 }));
         let sumTotalesAnuales = 0;
         let countTotalesAnuales = 0;
         exportData = [];
@@ -148,21 +148,28 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
             }
         });
 
-        // CALCULAR VALOR MEDIO ANUAL (Basado en los meses 13)
-        if (countTotalesAnuales > 0) {
-            const mediaAnual = sumTotalesAnuales / countTotalesAnuales;
-            document.getElementById('valorMedioAnual').innerText = `Valor medio anual: ${mediaAnual.toLocaleString('es-ES', formatReg)} mm`;
-        }
+        const mediaAnual = countTotalesAnuales > 0 ? sumTotalesAnuales / countTotalesAnuales : 0;
+        document.getElementById('valorMedioAnual').innerText = `Valor medio anual: ${mediaAnual.toLocaleString('es-ES', formatReg)} mm`;
 
         const mediasFinales = [];
-        exportData.push({ "Periodo": "--- MEDIAS MENSUALES ---", "Precipitación (mm)": "" });
         for (let i = 1; i <= 12; i++) {
             const mVal = stats[i].count > 0 ? stats[i].sum / stats[i].count : 0;
             mediasFinales.push(mVal);
             const mStr = mVal.toLocaleString('es-ES', formatReg);
-            cuerpoMed.innerHTML += `<tr class="fila-media"><td>${mesesNombres[i-1]}</td><td>${mStr} mm</td></tr>`;
-            exportData.push({ "Periodo": `Media ${mesesNombres[i-1]}`, "Precipitación (mm)": mStr });
+            cuerpoMed.innerHTML += `<tr><td>${mesesNombres[i-1]}</td><td>${mStr} mm</td></tr>`;
         }
+
+        // AGREGAR FILA DE TOTAL MEDIO ANUAL A LA TABLA DE MEDIAS
+        const mediaAnualStr = mediaAnual.toLocaleString('es-ES', formatReg);
+        cuerpoMed.innerHTML += `<tr class="fila-media"><td>TOTAL MEDIO ANUAL</td><td>${mediaAnualStr} mm</td></tr>`;
+
+        // Preparar Excel con el resumen de medias al final
+        exportData.push({ "Periodo": "--- RESUMEN MEDIAS ---", "Precipitación (mm)": "" });
+        for (let i = 1; i <= 12; i++) {
+            const mVal = stats[i].count > 0 ? stats[i].sum / stats[i].count : 0;
+            exportData.push({ "Periodo": `Media ${mesesNombres[i-1]}`, "Precipitación (mm)": mVal.toLocaleString('es-ES', formatReg) });
+        }
+        exportData.push({ "Periodo": "TOTAL MEDIO ANUAL", "Precipitación (mm)": mediaAnualStr });
 
         document.getElementById('panelAnalisis').style.display = "block";
         const ctx = document.getElementById('graficaLluvia').getContext('2d');
@@ -201,7 +208,7 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
 document.getElementById('btnExcel').addEventListener('click', () => {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Informe Clima");
+    XLSX.utils.book_append_sheet(wb, ws, "Informe");
     XLSX.writeFile(wb, "Informe_Precip_Final.xlsx");
 });
 </script>
