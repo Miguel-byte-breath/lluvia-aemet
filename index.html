@@ -16,7 +16,9 @@
         .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; font-size: 1.1em; }
         input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
         .result-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px; }
-        .chart-header { text-align: center; margin-bottom: 10px; color: #1e40af; font-size: 1.3em; font-weight: bold; }
+        .chart-header { text-align: center; margin-bottom: 20px; }
+        .titulo-principal { color: #1e40af; font-size: 1.3em; font-weight: bold; margin-bottom: 5px; }
+        .subtitulo-anual { color: #166534; font-size: 1.1em; font-weight: 600; background: #dcfce7; display: inline-block; padding: 5px 15px; border-radius: 20px; }
         .chart-container { height: 480px; margin-bottom: 30px; padding-top: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 0.85em; }
         th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: right; }
@@ -42,29 +44,31 @@
     </div>
 
     <div class="card">
-        <div class="header-step">📊 2. Informe Climatológico Mensual</div>
-        <p>Sube el archivo <code>datos_historicos.json</code> obtenido de Postman:</p>
+        <div class="header-step">📊 2. Informe de Precipitación Media</div>
         <input type="file" id="fileDatos" accept=".json">
         
         <div id="panelAnalisis" style="display:none">
-            <div id="tituloPeriodo" class="chart-header"></div>
+            <div class="chart-header">
+                <div id="tituloPeriodo" class="titulo-principal"></div>
+                <div id="valorMedioAnual" class="subtitulo-anual"></div>
+            </div>
             
             <div class="chart-container">
                 <canvas id="graficaLluvia"></canvas>
             </div>
 
-            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Técnico Completo</button>
+            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Completo en Excel</button>
 
             <div class="grid-tablas">
                 <div>
-                    <h4 style="color:#166534; border-bottom: 2px solid #bbf7d0;">📈 Resumen Medias (mm)</h4>
+                    <h4 style="color:#166534; border-bottom: 2px solid #bbf7d0;">📈 Medias Mensuales (mm)</h4>
                     <table>
                         <thead><tr><th>Mes</th><th>Media (mm)</th></tr></thead>
                         <tbody id="cuerpoMedias"></tbody>
                     </table>
                 </div>
                 <div>
-                    <h4 style="color:#1e40af; border-bottom: 2px solid #bfdbfe;">📅 Historial Detallado</h4>
+                    <h4 style="color:#1e40af; border-bottom: 2px solid #bfdbfe;">📅 Historial de Datos</h4>
                     <table>
                         <thead><tr><th>Año-Mes</th><th>Lluvia (mm)</th></tr></thead>
                         <tbody id="cuerpoTabla"></tbody>
@@ -99,12 +103,7 @@ function encontrarMasCercana() {
         });
         const res = document.getElementById('resBusqueda');
         res.style.display = "block";
-        // MODIFICACIÓN SOLICITADA: Incluir código AEMET con letra
-        res.innerHTML = `
-            <strong>✅ Estación:</strong> ${mejor.nombre} | 
-            <strong>Código AEMET:</strong> <span style="color:#e11d48; font-weight:bold;">${mejor.indicativo}</span> | 
-            <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km
-        `;
+        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Cód:</strong> <span style="color:#e11d48">${mejor.indicativo}</span> | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
     });
 }
 
@@ -124,20 +123,24 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
         const mesesReales = proc.filter(d => d.mes !== 13);
         const anioIni = mesesReales[0].anio;
         const anioFin = mesesReales[mesesReales.length - 1].anio;
-        document.getElementById('tituloPeriodo').innerText = `Media de Precipitación Mensual (mm) • Periodo ${anioIni} - ${anioFin}`;
+        document.getElementById('tituloPeriodo').innerText = `Evolución Mensual de Precipitación (${anioIni} - ${anioFin})`;
 
         const cuerpo = document.getElementById('cuerpoTabla');
         const cuerpoMed = document.getElementById('cuerpoMedias');
         cuerpo.innerHTML = ""; cuerpoMed.innerHTML = "";
         
         const stats = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
+        let sumTotalesAnuales = 0;
+        let countTotalesAnuales = 0;
         exportData = [];
 
         proc.forEach(d => {
             const vStr = d.valor.toLocaleString('es-ES', formatReg);
             if (d.mes === 13) {
-                cuerpo.innerHTML += `<tr class="fila-total"><td>TOTAL ANUAL ${d.anio}</td><td>${vStr} mm</td></tr>`;
-                exportData.push({ "Periodo": `TOTAL ${d.anio}`, "Precipitación (mm)": vStr });
+                cuerpo.innerHTML += `<tr class="fila-total"><td>TOTAL ${d.anio}</td><td>${vStr} mm</td></tr>`;
+                exportData.push({ "Periodo": `TOTAL ANUAL ${d.anio}`, "Precipitación (mm)": vStr });
+                sumTotalesAnuales += d.valor;
+                countTotalesAnuales++;
             } else {
                 cuerpo.innerHTML += `<tr><td>${d.fOriginal}</td><td>${vStr} mm</td></tr>`;
                 exportData.push({ "Periodo": d.fOriginal, "Precipitación (mm)": vStr });
@@ -145,8 +148,14 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
             }
         });
 
+        // CALCULAR VALOR MEDIO ANUAL (Basado en los meses 13)
+        if (countTotalesAnuales > 0) {
+            const mediaAnual = sumTotalesAnuales / countTotalesAnuales;
+            document.getElementById('valorMedioAnual').innerText = `Valor medio anual: ${mediaAnual.toLocaleString('es-ES', formatReg)} mm`;
+        }
+
         const mediasFinales = [];
-        exportData.push({ "Periodo": "--- RESUMEN MEDIAS ---", "Precipitación (mm)": "" });
+        exportData.push({ "Periodo": "--- MEDIAS MENSUALES ---", "Precipitación (mm)": "" });
         for (let i = 1; i <= 12; i++) {
             const mVal = stats[i].count > 0 ? stats[i].sum / stats[i].count : 0;
             mediasFinales.push(mVal);
@@ -163,15 +172,10 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
             type: 'bar',
             data: { 
                 labels: mesesNombres, 
-                datasets: [{ 
-                    data: mediasFinales, 
-                    backgroundColor: '#16a34a',
-                    borderRadius: 6 
-                }] 
+                datasets: [{ data: mediasFinales, backgroundColor: '#16a34a', borderRadius: 6 }] 
             },
             options: { 
-                responsive: true, 
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
                     datalabels: {
@@ -183,7 +187,7 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
                 scales: { 
                     y: { 
                         beginAtZero: true,
-                        suggestedMax: Math.max(...mediasFinales) * 1.2,
+                        suggestedMax: Math.max(...mediasFinales) * 1.25,
                         title: { display: true, text: 'Precipitación (mm)', font: { weight: 'bold' } },
                         ticks: { callback: v => v.toLocaleString('es-ES', formatReg) } 
                     } 
@@ -197,8 +201,8 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
 document.getElementById('btnExcel').addEventListener('click', () => {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Informe");
-    XLSX.writeFile(wb, "Informe_Precipitacion_AEMET.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Informe Clima");
+    XLSX.writeFile(wb, "Informe_Precip_Final.xlsx");
 });
 </script>
 </body>
