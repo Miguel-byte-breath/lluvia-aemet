@@ -2,25 +2,29 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Herramienta Agro-Climática AEMET</title>
+    <title>Analizador Agro-Climático AEMET</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f1f5f9; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f8fafc; color: #1e293b; }
         .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
-        .header { text-align: center; border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 20px; }
-        .upload-area { background: #ecfdf5; border: 2px dashed #10b981; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
-        .btn-excel { background: #059669; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; display: none; margin: 10px auto; }
-        .btn-excel:hover { background: #047857; }
-        #info-estacion { font-weight: bold; color: #065f46; margin-top: 10px; }
-        .chart-box { height: 400px; margin-top: 20px; }
+        .header { text-align: center; border-bottom: 3px solid #3b82f6; padding-bottom: 20px; margin-bottom: 20px; }
+        .upload-area { background: #eff6ff; border: 2px dashed #3b82f6; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
+        #info-estacion { font-weight: bold; color: #1e40af; font-size: 1.2em; margin-top: 15px; }
+        .btn-excel { background: #16a34a; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; display: none; margin: 20px auto; transition: 0.3s; }
+        .btn-excel:hover { background: #15803d; }
+        .chart-box { height: 400px; margin-bottom: 40px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; display: none; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #f1f5f9; color: #475569; }
+        tr:hover { background-color: #f8fafc; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Analizador de Datos AEMET</h1>
-            <p>Carga el JSON de Postman para procesar la información</p>
+            <h1>📊 Analizador de Lluvia AEMET</h1>
+            <p>Selecciona cualquier JSON descargado de Postman</p>
         </div>
 
         <div class="upload-area">
@@ -35,10 +39,20 @@
         <div class="chart-box">
             <canvas id="graficaLluvia"></canvas>
         </div>
+
+        <table id="tablaDatos">
+            <thead>
+                <tr>
+                    <th>Mes / Periodo</th>
+                    <th>Precipitación Acumulada (mm)</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpoTabla"></tbody>
+        </table>
     </div>
 
     <script>
-        let datosProcesados = []; // Guardaremos los datos para el Excel
+        let datosExcel = [];
         let miGrafica = null;
 
         document.getElementById('inputJson').addEventListener('change', function(e) {
@@ -49,21 +63,21 @@
             reader.onload = function(e) {
                 try {
                     const datos = JSON.parse(e.target.result);
-                    procesarDatos(datos);
-                } catch (error) {
-                    alert("Error: El archivo no es un JSON válido.");
+                    procesarLluvia(datos);
+                } catch (err) {
+                    alert("Error: El archivo no es un JSON válido de AEMET.");
                 }
             };
             reader.readAsText(archivo);
         });
 
-        function procesarDatos(datos) {
+        function procesarLluvia(datos) {
             if (!datos.length) return;
 
-            // Info de la estación
-            document.getElementById('info-estacion').innerText = `Estación: ${datos[0].nombre} (${datos[0].indicativo})`;
-            document.getElementById('btnExportar').style.display = 'block';
-
+            // 1. Mostrar Nombre y Código AEMET automáticamente
+            document.getElementById('info-estacion').innerHTML = 
+                `Estación: ${datos[0].nombre} <span style="font-size: 0.8em; color: #64748b; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; margin-left: 10px;">Cód: ${datos[0].indicativo}</span>`;
+            
             const resumen = {};
             datos.forEach(d => {
                 if (d.fecha && d.prec) {
@@ -76,36 +90,44 @@
             const etiquetas = Object.keys(resumen).sort();
             const valores = etiquetas.map(m => resumen[m]);
 
-            // Guardamos para el Excel
-            datosProcesados = etiquetas.map(m => ({ "Mes": m, "Lluvia Total (mm)": resumen[m].toFixed(1) }));
-
-            dibujarGrafica(etiquetas, valores);
-        }
-
-        function dibujarGrafica(labels, values) {
-            const ctx = document.getElementById('graficaLluvia').getContext('2d');
+            // 2. Preparar datos para Excel y Tabla
+            datosExcel = etiquetas.map(m => ({ "Mes": m, "Lluvia (mm)": resumen[m].toFixed(1) }));
             
-            if (miGrafica) miGrafica.destroy(); // Borra la gráfica anterior si existe
+            // 3. Mostrar elementos ocultos
+            document.getElementById('btnExportar').style.display = 'block';
+            document.getElementById('tablaDatos').style.display = 'table';
 
+            // 4. Rellenar Tabla
+            const cuerpo = document.getElementById('cuerpoTabla');
+            cuerpo.innerHTML = "";
+            datosExcel.forEach(fila => {
+                cuerpo.innerHTML += `<tr><td>${fila.Mes}</td><td><strong>${fila["Lluvia (mm)"]} mm</strong></td></tr>`;
+            });
+
+            // 5. Dibujar Gráfica
+            const ctx = document.getElementById('graficaLluvia').getContext('2d');
+            if (miGrafica) miGrafica.destroy();
             miGrafica = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: etiquetas,
                     datasets: [{
-                        label: 'Precipitación Acumulada (mm)',
-                        data: values,
-                        backgroundColor: '#10b981'
+                        label: 'Precipitación (mm)',
+                        data: valores,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 6
                     }]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
             });
         }
 
+        // Función para descargar Excel
         document.getElementById('btnExportar').addEventListener('click', function() {
-            const ws = XLSX.utils.json_to_sheet(datosProcesados);
+            const ws = XLSX.utils.json_to_sheet(datosExcel);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Resumen Lluvia");
-            XLSX.writeFile(wb, "Resumen_AEMET_Mensual.xlsx");
+            XLSX.utils.book_append_sheet(wb, ws, "Lluvias");
+            XLSX.writeFile(wb, "Informe_Lluvia_AEMET.xlsx");
         });
     </script>
 </body>
