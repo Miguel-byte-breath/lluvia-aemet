@@ -17,7 +17,7 @@
         input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
         .result-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px; }
         .chart-header { text-align: center; margin-bottom: 10px; color: #1e40af; font-size: 1.3em; font-weight: bold; }
-        .chart-container { height: 450px; margin-bottom: 30px; padding-top: 20px; }
+        .chart-container { height: 480px; margin-bottom: 30px; padding-top: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 0.85em; }
         th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: right; }
         th { background: #f1f5f9; text-align: left; color: #475569; }
@@ -42,8 +42,8 @@
     </div>
 
     <div class="card">
-        <div class="header-step">📊 2. Análisis de Medias Mensuales</div>
-        <p>Carga el archivo <code>datos_historicos.json</code> de Postman:</p>
+        <div class="header-step">📊 2. Informe Climatológico Mensual</div>
+        <p>Sube el archivo <code>datos_historicos.json</code> obtenido de Postman:</p>
         <input type="file" id="fileDatos" accept=".json">
         
         <div id="panelAnalisis" style="display:none">
@@ -53,18 +53,18 @@
                 <canvas id="graficaLluvia"></canvas>
             </div>
 
-            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Técnico Completo</button>
+            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Completo (Formato .xlsx)</button>
 
             <div class="grid-tablas">
                 <div>
-                    <h4 style="color:#166534; border-bottom: 2px solid #bbf7d0;">📈 Resumen de Medias (,0)</h4>
+                    <h4 style="color:#166534; border-bottom: 2px solid #bbf7d0;">📈 Resumen Medias (mm)</h4>
                     <table>
                         <thead><tr><th>Mes</th><th>Media (mm)</th></tr></thead>
                         <tbody id="cuerpoMedias"></tbody>
                     </table>
                 </div>
                 <div>
-                    <h4 style="color:#1e40af; border-bottom: 2px solid #bfdbfe;">📅 Historial Completo</h4>
+                    <h4 style="color:#1e40af; border-bottom: 2px solid #bfdbfe;">📅 Historial Detallado</h4>
                     <table>
                         <thead><tr><th>Año-Mes</th><th>Lluvia (mm)</th></tr></thead>
                         <tbody id="cuerpoTabla"></tbody>
@@ -76,9 +76,7 @@
 </div>
 
 <script>
-// Registrar el plugin para mostrar números sobre las columnas
 Chart.register(ChartDataLabels);
-
 const formatReg = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -101,7 +99,7 @@ function encontrarMasCercana() {
         });
         const res = document.getElementById('resBusqueda');
         res.style.display = "block";
-        res.innerHTML = `<strong>✅ Estación de Referencia:</strong> ${mejor.nombre} | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
+        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Referencia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
     });
 }
 
@@ -113,7 +111,6 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
     reader.onload = (ev) => {
         const raw = JSON.parse(ev.target.result);
         
-        // 1. Procesar y ordenar
         let proc = raw.map(d => {
             const p = d.fecha.split('-');
             return { anio: parseInt(p[0]), mes: parseInt(p[1]), fOriginal: d.fecha, valor: parseFloat(String(d.p_mes || d.prec || "0").replace(',', '.')) || 0 };
@@ -122,7 +119,7 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
         const mesesReales = proc.filter(d => d.mes !== 13);
         const anioIni = mesesReales[0].anio;
         const anioFin = mesesReales[mesesReales.length - 1].anio;
-        document.getElementById('tituloPeriodo').innerText = `Media de Lluvia Mensual (Periodo ${anioIni} - ${anioFin})`;
+        document.getElementById('tituloPeriodo').innerText = `Media de Precipitación Mensual (mm) • Periodo ${anioIni} - ${anioFin}`;
 
         const cuerpo = document.getElementById('cuerpoTabla');
         const cuerpoMed = document.getElementById('cuerpoMedias');
@@ -131,7 +128,6 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
         const stats = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
         exportData = [];
 
-        // 2. Historial
         proc.forEach(d => {
             const vStr = d.valor.toLocaleString('es-ES', formatReg);
             if (d.mes === 13) {
@@ -144,31 +140,28 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
             }
         });
 
-        // 3. Medias para el gráfico
         const mediasFinales = [];
-        exportData.push({ "Periodo": "--- RESUMEN DE MEDIAS ---", "Precipitación (mm)": "" });
+        exportData.push({ "Periodo": "--- RESUMEN MEDIAS ---", "Precipitación (mm)": "" });
         for (let i = 1; i <= 12; i++) {
             const mVal = stats[i].count > 0 ? stats[i].sum / stats[i].count : 0;
             mediasFinales.push(mVal);
             const mStr = mVal.toLocaleString('es-ES', formatReg);
             cuerpoMed.innerHTML += `<tr class="fila-media"><td>${mesesNombres[i-1]}</td><td>${mStr} mm</td></tr>`;
-            exportData.push({ "Periodo": `MEDIA ${mesesNombres[i-1]}`, "Precipitación (mm)": mStr });
+            exportData.push({ "Periodo": `Media ${mesesNombres[i-1]}`, "Precipitación (mm)": mStr });
         }
 
         document.getElementById('panelAnalisis').style.display = "block";
         const ctx = document.getElementById('graficaLluvia').getContext('2d');
         if(miGrafica) miGrafica.destroy();
         
-        // 4. Crear Gráfica con Etiquetas de un decimal sobre las columnas
         miGrafica = new Chart(ctx, {
             type: 'bar',
             data: { 
                 labels: mesesNombres, 
                 datasets: [{ 
-                    label: 'Media (mm)', 
                     data: mediasFinales, 
                     backgroundColor: '#16a34a',
-                    borderRadius: 5 
+                    borderRadius: 6 
                 }] 
             },
             options: { 
@@ -176,18 +169,17 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
-                    datalabels: { // Configuración de los valores sobre las columnas
-                        anchor: 'end',
-                        align: 'top',
-                        formatter: (val) => val.toLocaleString('es-ES', formatReg),
-                        font: { weight: 'bold', size: 12 },
-                        color: '#1e3a8a'
+                    datalabels: {
+                        anchor: 'end', align: 'top',
+                        formatter: (val) => val.toLocaleString('es-ES', formatReg) + ' mm',
+                        font: { weight: 'bold', size: 11 }, color: '#1e3a8a'
                     }
                 },
                 scales: { 
                     y: { 
                         beginAtZero: true,
-                        suggestedMax: Math.max(...mediasFinales) * 1.15, // Espacio arriba para el número
+                        suggestedMax: Math.max(...mediasFinales) * 1.2,
+                        title: { display: true, text: 'Precipitación (mm)', font: { weight: 'bold' } },
                         ticks: { callback: v => v.toLocaleString('es-ES', formatReg) } 
                     } 
                 }
@@ -201,7 +193,7 @@ document.getElementById('btnExcel').addEventListener('click', () => {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Informe");
-    XLSX.writeFile(wb, "Informe_Agro_Final.xlsx");
+    XLSX.writeFile(wb, "Informe_Precipitacion_AEMET.xlsx");
 });
 </script>
 </body>
