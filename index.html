@@ -9,24 +9,28 @@
         body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f0f4f8; color: #1e293b; }
         .container { max-width: 1000px; margin: auto; }
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .header-step { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; color: #1e3a8a; font-weight: bold; }
+        .header-step { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; color: #1e3a8a; font-weight: bold; font-size: 1.2em; }
         .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .btn-blue { background: #3b82f6; color: white; }
-        .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; }
+        .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; font-size: 1.1em; }
+        .btn:hover { opacity: 0.9; }
         input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
         .result-box { background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe; margin-top: 15px; }
         .chart-container { height: 400px; margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: right; }
+        th:first-child, td:first-child { text-align: left; }
+        th { background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 0.8em; }
+        .decimal-highlight { font-weight: bold; color: #2563eb; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="card">
-        <div class="header-step">📍 1. Localizar Estación por Coordenadas</div>
-        <p>Introduce las coordenadas de tu parcela (EPSG:4258):</p>
-        <div style="display: flex; gap: 15px; align-items: center;">
+        <div class="header-step">📍 1. Localizar Estación más Cercana</div>
+        <p>Introduce las coordenadas de tu parcela (latitud/longitud):</p>
+        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
             Lat: <input type="number" id="userLat" value="39.443557" step="0.000001">
             Lon: <input type="number" id="userLon" value="-0.740434" step="0.000001">
             <button class="btn btn-blue" onclick="encontrarMasCercana()">Buscar Estación</button>
@@ -35,17 +39,22 @@
     </div>
 
     <div class="card">
-        <div class="header-step">📊 2. Análisis y Exportación de Datos</div>
-        <p>Carga el archivo JSON de lluvia que obtuviste de Postman:</p>
+        <div class="header-step">📊 2. Análisis y Exportación Regional (Formato ,00)</div>
+        <p>Carga el JSON de lluvia obtenido de Postman:</p>
         <input type="file" id="fileDatos" accept=".json">
         
         <div id="panelAnalisis" style="display:none">
-            <button id="btnExcel" class="btn btn-green">📥 Descargar Resumen Mensual en EXCEL</button>
+            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Excel (Separador: Coma)</button>
             <div class="chart-container">
                 <canvas id="graficaLluvia"></canvas>
             </div>
             <table id="tablaResumen">
-                <thead><tr><th>Mes</th><th>Precipitación Acumulada (mm)</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Mes / Periodo</th>
+                        <th>Precipitación Acumulada (mm)</th>
+                    </tr>
+                </thead>
                 <tbody id="cuerpoTabla"></tbody>
             </table>
         </div>
@@ -53,7 +62,7 @@
 </div>
 
 <script>
-// --- FUNCIÓN PARA CONVERTIR COORDENADAS AEMET ---
+// --- CONVERTIDOR COORDENADAS AEMET ---
 function aemetToDec(coord) {
     if(!coord) return 0;
     const dir = coord.slice(-1);
@@ -65,47 +74,42 @@ function aemetToDec(coord) {
     return (dir === 'S' || dir === 'W') ? -dec : dec;
 }
 
-// --- BUSCADOR AUTOMÁTICO ---
+// --- BUSCADOR ---
 function encontrarMasCercana() {
-    const latU = parseFloat(document.getElementById('userLat').value);
-    const lonU = parseFloat(document.getElementById('userLon').value);
-
-    // Cargamos el archivo que ya está en GitHub
     fetch('estaciones.json')
         .then(res => res.json())
         .then(estaciones => {
+            const latU = parseFloat(document.getElementById('userLat').value);
+            const lonU = parseFloat(document.getElementById('userLon').value);
             let mejor = null, dMin = Infinity;
 
             estaciones.forEach(est => {
                 const latE = aemetToDec(est.latitud);
                 const lonE = aemetToDec(est.longitud);
-                // Pitágoras simple para distancias cortas (suficiente para esto)
                 const d = Math.sqrt(Math.pow(latU - latE, 2) + Math.pow(lonU - lonE, 2)) * 111;
-                
                 if(d < dMin) { dMin = d; mejor = est; }
             });
 
             const res = document.getElementById('resBusqueda');
             res.style.display = "block";
             res.innerHTML = `
-                <strong>✅ Estación más cercana:</strong> ${mejor.nombre}<br>
-                <strong>📌 Indicativo AEMET:</strong> <span style="color:#e11d48; font-size:1.2em">${mejor.indicativo}</span><br>
-                <strong>📏 Distancia a tu parcela:</strong> ${dMin.toFixed(2)} km<br>
-                <p style="margin-top:10px; font-size:0.9em; color:#475569;">Copia este indicativo en Postman para obtener los datos de esta estación.</p>
+                <strong>✅ Estación detectada:</strong> ${mejor.nombre}<br>
+                <strong>📌 Indicativo:</strong> <span style="color:#e11d48; font-size:1.2em">${mejor.indicativo}</span><br>
+                <strong>📏 Distancia:</strong> ${dMin.toLocaleString('es-ES', {maxFractionDigits:2})} km
             `;
-        })
-        .catch(err => alert("Error leyendo estaciones.json de GitHub. ¿Lo has subido ya?"));
+        }).catch(() => alert("Error: Sube 'estaciones.json' a tu GitHub primero."));
 }
 
-// --- LÓGICA DE GRÁFICA Y EXCEL ---
+// --- ANÁLISIS Y EXCEL ---
 let miGrafica = null;
-let datosExcel = [];
+let datosExportar = [];
 
 document.getElementById('fileDatos').addEventListener('change', function(e) {
     const reader = new FileReader();
     reader.onload = (event) => {
         const datos = JSON.parse(event.target.result);
         const resumen = {};
+        
         datos.forEach(d => {
             if(d.fecha && d.prec) {
                 const m = d.fecha.substring(0, 7);
@@ -116,29 +120,48 @@ document.getElementById('fileDatos').addEventListener('change', function(e) {
 
         const labels = Object.keys(resumen).sort();
         const values = labels.map(l => resumen[l]);
-        datosExcel = labels.map(l => ({ "Mes": l, "Lluvia (mm)": resumen[l].toFixed(1) }));
+        
+        // Formateamos para tabla y excel con COMA
+        datosExportar = labels.map(l => ({
+            "Mes": l,
+            "Precipitación (mm)": resumen[l].toLocaleString('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1})
+        }));
 
         document.getElementById('panelAnalisis').style.display = "block";
         const cuerpo = document.getElementById('cuerpoTabla');
         cuerpo.innerHTML = "";
-        datosExcel.forEach(f => cuerpo.innerHTML += `<tr><td>${f.Mes}</td><td>${f["Lluvia (mm)"]} mm</td></tr>`);
+        datosExportar.forEach(f => {
+            cuerpo.innerHTML += `<tr><td>${f.Mes}</td><td class="decimal-highlight">${f["Precipitación (mm)"]} mm</td></tr>`;
+        });
 
         const ctx = document.getElementById('graficaLluvia').getContext('2d');
         if(miGrafica) miGrafica.destroy();
         miGrafica = new Chart(ctx, {
             type: 'bar',
-            data: { labels: labels, datasets: [{ label: 'Precipitación (mm)', data: values, backgroundColor: '#3b82f6' }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: { 
+                labels: labels, 
+                datasets: [{ 
+                    label: 'Lluvia (mm)', 
+                    data: values, 
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 4
+                }] 
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => v.toLocaleString('es-ES') } } }
+            }
         });
     };
     reader.readAsText(e.target.files[0]);
 });
 
 document.getElementById('btnExcel').addEventListener('click', () => {
-    const ws = XLSX.utils.json_to_sheet(datosExcel);
+    const ws = XLSX.utils.json_to_sheet(datosExportar);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Datos");
-    XLSX.writeFile(wb, "Informe_Lluvia_Parcela.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Datos Lluvia");
+    XLSX.writeFile(wb, "Informe_Precipitacion_Regional.xlsx");
 });
 </script>
 </body>
