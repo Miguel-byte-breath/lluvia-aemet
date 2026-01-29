@@ -16,22 +16,22 @@ Este repositorio contiene una herramienta técnica diseñada para la **caracteri
 
 La herramienta aplica criterios de limpieza y ordenación para asegurar la integridad del informe:
 
-1.  **Conversión de Coordenadas**:
-    Transformación de formato GMS (Grados, Minutos, Segundos) de AEMET a Grados Decimales para compatibilidad con GPS estándar.
+1. **Conversión de Coordenadas**: Transformación de formato GMS (Grados, Minutos, Segundos) de AEMET a Grados Decimales para compatibilidad con GPS estándar.
+2. **Filtrado de Registros**:
+   
+   $$Precipitación_{Mensual} = \sum \text{Dato validado (excluyendo totales anuales)}$$
 
-2.  **Filtrado de Registros**:
-    $$Precipitación_{Mensual} = \sum \text{Dato validado (excluyendo totales anuales)}$$
-
-3.  **Cálculo de la Media del Periodo**:
-    $$\mu_{mes} = \frac{\sum P_{i}}{n}$$
-    *Donde $P_i$ es la precipitación del mes en el año $i$ y $n$ el número de años analizados.*
+3. **Cálculo de la Media del Periodo**:
+   
+   $$\mu_{mes} = \frac{\sum P_{i}}{n}$$
+   
+   *Donde $P_i$ es la precipitación del mes en el año $i$ y $n$ el número de años analizados.*
 
 ## 🛠️ Stack Tecnológico
 
 * **Frontend**: HTML5, CSS3, JavaScript (ES6+).
-* **Gráficos**: [Chart.js](https://www.chartjs.org/) para la representación visual de la pluviometría.
-* **Exportación**: [SheetJS (XLSX)](https://sheetjs.com/) para la generación de informes descargables.
-* **Datos**: Integración directa con el catálogo de servicios de AEMET OpenData.
+* **Gráficos**: [Chart.js](https://www.chartjs.org/)
+* **Exportación**: [SheetJS (XLSX)](https://sheetjs.com/)
 
 ---
 *Herramienta desarrollada para el apoyo a la consultoría técnica y planificación agrícola.*
