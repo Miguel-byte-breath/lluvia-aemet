@@ -2,62 +2,77 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard Agronómico - Chinchilla</title>
-    <script src="chart.js"></script>
+    <title>Análisis de Lluvia - Chinchilla</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 30px; background-color: #f8fafc; color: #1e293b; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-        h1 { color: #0f172a; text-align: center; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
-        #error-display { color: #991b1b; background: #fef2f2; padding: 10px; border-radius: 6px; display: none; margin: 15px 0; border: 1px solid #fecaca; text-align: center; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f4f7f9; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        #error-msg { color: #721c24; background: #f8d7da; padding: 10px; border-radius: 5px; display: none; margin: 15px 0; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Análisis de Precipitación Mensual</h1>
-        <div id="error-display"></div>
+        <h1>Precipitación Mensual Acumulada</h1>
+        <div id="error-msg"></div>
         <div style="height: 400px; margin-top: 20px;">
             <canvas id="graficaLluvia"></canvas>
         </div>
     </div>
 
     <script>
-        const errorDiv = document.getElementById('error-display');
-
-        // Comprobación de que la librería está cargada
-        if (typeof Chart === 'undefined') {
-            errorDiv.style.display = 'block';
-            errorDiv.innerText = "⚠️ Error: La pieza 'chart.js' no se ha cargado correctamente en el navegador.";
-        }
+        const errorDiv = document.getElementById('error-msg');
 
         fetch('datos_clima.json')
             .then(res => {
-                if(!res.ok) throw new Error("No encuentro el archivo 'datos_clima.json'. Revisa el nombre.");
+                if(!res.ok) throw new Error("No se encuentra 'datos_clima.json'. Verifica el nombre.");
                 return res.json();
             })
             .then(datos => {
                 const meses = {};
+
                 datos.forEach(d => {
-                    const mes = d.fecha.substring(0, 7);
-                    const lluvia = parseFloat(d.prec.replace(',', '.')) || 0;
-                    meses[mes] = (meses[mes] || 0) + lluvia;
+                    // VERIFICACIÓN DE SEGURIDAD: Solo procesamos si existe fecha y precipitación
+                    if (d.fecha && d.prec !== undefined && d.prec !== null) {
+                        const mes = d.fecha.substring(0, 7); // Extrae el año-mes
+                        
+                        // Convertimos a texto por seguridad y cambiamos coma por punto
+                        let precTexto = String(d.prec).replace(',', '.');
+                        
+                        // Si es "Ip" (inapreciable) o no es un número, ponemos 0
+                        const lluvia = parseFloat(precTexto) || 0;
+                        
+                        meses[mes] = (meses[mes] || 0) + lluvia;
+                    }
                 });
+
+                // Ordenamos los meses para que la gráfica salga en orden cronológico
+                const etiquetas = Object.keys(meses).sort();
+                const valores = etiquetas.map(m => meses[m].toFixed(1));
 
                 new Chart(document.getElementById('graficaLluvia'), {
                     type: 'bar',
                     data: {
-                        labels: Object.keys(meses),
+                        labels: etiquetas,
                         datasets: [{
                             label: 'Lluvia acumulada (mm)',
-                            data: Object.values(meses).map(v => v.toFixed(1)),
-                            backgroundColor: '#3b82f6'
+                            data: valores,
+                            backgroundColor: '#3498db',
+                            borderColor: '#2980b9',
+                            borderWidth: 1
                         }]
                     },
-                    options: { responsive: true, maintainAspectRatio: false }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true } }
+                    }
                 });
             })
             .catch(err => {
                 errorDiv.style.display = 'block';
                 errorDiv.innerText = "⚠️ Error: " + err.message;
+                console.error(err);
             });
     </script>
 </body>
