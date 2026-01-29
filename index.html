@@ -2,95 +2,111 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard AEMET - Estación</title>
+    <title>Herramienta Agro-Climática AEMET</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f8fafc; color: #1e293b; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        
-        /* Estilo para el encabezado */
-        .header { border-bottom: 3px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px; text-align: center; }
-        h1 { margin: 0; color: #0f172a; font-size: 1.8em; }
-        .station-info { color: #3b82f6; font-size: 1.2em; font-weight: bold; margin-top: 5px; }
-        .aemet-code { font-size: 0.8em; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; margin-left: 10px; border: 1px solid #e2e8f0; }
-
-        #error-msg { color: #b91c1c; background: #fef2f2; padding: 15px; border-radius: 8px; display: none; margin: 20px 0; border: 1px solid #fecaca; }
-        .chart-box { height: 450px; width: 100%; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f1f5f9; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
+        .header { text-align: center; border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 20px; }
+        .upload-area { background: #ecfdf5; border: 2px dashed #10b981; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+        .btn-excel { background: #059669; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; display: none; margin: 10px auto; }
+        .btn-excel:hover { background: #047857; }
+        #info-estacion { font-weight: bold; color: #065f46; margin-top: 10px; }
+        .chart-box { height: 400px; margin-top: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Registro Pluviométrico Mensual</h1>
-            <div id="info-estacion" class="station-info">
-                <span id="txtNombre">Cargando estación...</span>
-                <span id="txtCodigo" class="aemet-code">---</span>
-            </div>
+            <h1>Analizador de Datos AEMET</h1>
+            <p>Carga el JSON de Postman para procesar la información</p>
         </div>
-        
-        <div id="error-msg"></div>
-        
+
+        <div class="upload-area">
+            <input type="file" id="inputJson" accept=".json">
+            <div id="info-estacion"></div>
+        </div>
+
+        <div style="text-align: center;">
+            <button id="btnExportar" class="btn-excel">📥 Descargar Resumen en Excel</button>
+        </div>
+
         <div class="chart-box">
             <canvas id="graficaLluvia"></canvas>
         </div>
     </div>
 
     <script>
-        const errorDiv = document.getElementById('error-msg');
+        let datosProcesados = []; // Guardaremos los datos para el Excel
+        let miGrafica = null;
 
-        fetch('datos_clima.json')
-            .then(res => {
-                if(!res.ok) throw new Error("No se encuentra el archivo 'datos_clima.json'.");
-                return res.json();
-            })
-            .then(datos => {
-                if (datos.length > 0) {
-                    // Visualizamos el Nombre y el Código de AEMET
-                    document.getElementById('txtNombre').innerText = datos[0].nombre;
-                    document.getElementById('txtCodigo').innerText = "Cód. AEMET: " + datos[0].indicativo;
+        document.getElementById('inputJson').addEventListener('change', function(e) {
+            const archivo = e.target.files[0];
+            if (!archivo) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const datos = JSON.parse(e.target.result);
+                    procesarDatos(datos);
+                } catch (error) {
+                    alert("Error: El archivo no es un JSON válido.");
                 }
+            };
+            reader.readAsText(archivo);
+        });
 
-                const meses = {};
-                datos.forEach(d => {
-                    if (d.fecha && d.prec !== undefined) {
-                        const mes = d.fecha.substring(0, 7);
-                        let valorLluvia = String(d.prec).replace(',', '.');
-                        const lluvia = parseFloat(valorLluvia) || 0;
-                        meses[mes] = (meses[mes] || 0) + lluvia;
-                    }
-                });
+        function procesarDatos(datos) {
+            if (!datos.length) return;
 
-                const etiquetas = Object.keys(meses).sort();
-                const valores = etiquetas.map(m => meses[m].toFixed(1));
+            // Info de la estación
+            document.getElementById('info-estacion').innerText = `Estación: ${datos[0].nombre} (${datos[0].indicativo})`;
+            document.getElementById('btnExportar').style.display = 'block';
 
-                new Chart(document.getElementById('graficaLluvia'), {
-                    type: 'bar',
-                    data: {
-                        labels: etiquetas,
-                        datasets: [{
-                            label: 'Lluvia total (mm)',
-                            data: valores,
-                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
-                            borderColor: '#2563eb',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top' }
-                        },
-                        scales: {
-                            y: { beginAtZero: true, title: { display: true, text: 'Milímetros (mm)' } }
-                        }
-                    }
-                });
-            })
-            .catch(err => {
-                errorDiv.style.display = 'block';
-                errorDiv.innerText = "⚠️ Error: " + err.message;
+            const resumen = {};
+            datos.forEach(d => {
+                if (d.fecha && d.prec) {
+                    const mes = d.fecha.substring(0, 7);
+                    const lluvia = parseFloat(d.prec.replace(',', '.')) || 0;
+                    resumen[mes] = (resumen[mes] || 0) + lluvia;
+                }
             });
+
+            const etiquetas = Object.keys(resumen).sort();
+            const valores = etiquetas.map(m => resumen[m]);
+
+            // Guardamos para el Excel
+            datosProcesados = etiquetas.map(m => ({ "Mes": m, "Lluvia Total (mm)": resumen[m].toFixed(1) }));
+
+            dibujarGrafica(etiquetas, valores);
+        }
+
+        function dibujarGrafica(labels, values) {
+            const ctx = document.getElementById('graficaLluvia').getContext('2d');
+            
+            if (miGrafica) miGrafica.destroy(); // Borra la gráfica anterior si existe
+
+            miGrafica = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Precipitación Acumulada (mm)',
+                        data: values,
+                        backgroundColor: '#10b981'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        document.getElementById('btnExportar').addEventListener('click', function() {
+            const ws = XLSX.utils.json_to_sheet(datosProcesados);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Resumen Lluvia");
+            XLSX.writeFile(wb, "Resumen_AEMET_Mensual.xlsx");
+        });
     </script>
 </body>
 </html>
