@@ -53,7 +53,7 @@
                 <canvas id="graficaLluvia"></canvas>
             </div>
 
-            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Completo (Formato .xlsx)</button>
+            <button id="btnExcel" class="btn btn-green">📥 Descargar Informe Técnico Completo</button>
 
             <div class="grid-tablas">
                 <div>
@@ -99,7 +99,12 @@ function encontrarMasCercana() {
         });
         const res = document.getElementById('resBusqueda');
         res.style.display = "block";
-        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Referencia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km`;
+        // MODIFICACIÓN SOLICITADA: Incluir código AEMET con letra
+        res.innerHTML = `
+            <strong>✅ Estación:</strong> ${mejor.nombre} | 
+            <strong>Código AEMET:</strong> <span style="color:#e11d48; font-weight:bold;">${mejor.indicativo}</span> | 
+            <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', formatReg)} km
+        `;
     });
 }
 
